@@ -9,22 +9,22 @@ X="i love you"
 X_indices=[1,2,3] #X에 대한 단어 인덱스
 dm=512
 h=8
-N=1
+N=3
 seq_len=len(X_indices)
 dv=dm//h
 dq=dm//h
 dk=dm//h
 
-wq=torch.randn(dm, dm, requires_grad=True)
-wk=torch.randn(dm, dm, requires_grad=True)
-wv=torch.randn(dm, dm, requires_grad=True)
-w0=torch.randn(dm, dm, requires_grad=True)
-w1=torch.randn(dm, dm*4, requires_grad=True)
-w2=torch.randn(dm*4, dm, requires_grad=True)
+wq_n=torch.randn(N,dm, dm,  requires_grad=True)
+wk_n=torch.randn(N,dm, dm, requires_grad=True)
+wv_n=torch.randn(N,dm, dm,requires_grad=True)
+w0_n=torch.randn(N,dm, dm,requires_grad=True)
+w1_n=torch.randn(N,dm, dm*4, requires_grad=True)
+w2_n=torch.randn(N,dm*4, dm, requires_grad=True)
 
 
-b1=torch.zeros(seq_len,dm*4, requires_grad=True)
-b2=torch.zeros(seq_len,dm, requires_grad=True)
+b1_n=torch.zeros(N,seq_len,dm*4, requires_grad=True)
+b2_n=torch.zeros(N,seq_len,dm, requires_grad=True)
 
 # 1. 단어 사전(Vocabulary) 크기 정의 (예: 1000개 단어)
 vocab_size = 1000
@@ -41,9 +41,6 @@ def input_embedding(X_index): #입력값은 단어 인덱스
 
 embedded_X=input_embedding(X_indices)
 
-Q=embedded_X@wq
-K=embedded_X@wk
-V=embedded_X@wv
 
 def softmax(x):
     e_x =torch.exp(x - torch.max(x, axis=-1, keepdims=True)[0])
@@ -58,7 +55,6 @@ def PE(pos,i):
 
 def Add_Norm(x,y):
     x=(x+y) #add
-    print(x.shape)
     for i in range(x.shape[0]):
         mean=torch.mean(x[i])
         std=torch.std(x[i])
@@ -88,34 +84,40 @@ def FFN(x):
 
 #-----------<encoder>---------------
 
+
+
 #1.embedding
 embedded_X=input_embedding(X_indices)
-
 Positional_encoding=torch.zeros(seq_len,dm)
-
 for pos in range(seq_len):
     for i in range(dm):
         Positional_encoding[pos][i]=PE(pos,i)
 
 PE_X=Positional_encoding + embedded_X
 
+for n in range(N):
+    wq=wq_n[n]
+    wk=wk_n[n]
+    wv=wv_n[n]
+    w0=w0_n[n]
+    w1=w1_n[n]
+    w2=w2_n[n]
+    b1=b1_n[n]
+    b1=b1_n[n]
+    #2.Q,K,V 초기값
+    Q=PE_X@wq #seq_len,dq
+    K=PE_X@wk
+    V=PE_X@wv
 
-#2.Q,K,V 초기값
-Q=PE_X@wq #seq_len,dq
-K=PE_X@wk
-V=PE_X@wv
-
-MHA_output=MHA(Q,K,V)
-
-Add_Norm_output=Add_Norm(PE_X,MHA_output)
-
-FFN_output=FFN(Add_Norm_output)
+    MHA_output=MHA(Q,K,V)
+    Add_Norm_output=Add_Norm(PE_X,MHA_output)
+    FFN_output=FFN(Add_Norm_output)
+    Y=Add_Norm(Add_Norm_output,FFN_output)
+    print(n, Y.shape)
+    PE_X=Y
 
 
 
-Y=Add_Norm(Add_Norm_output,FFN_output)
-print(Y)
-print(Y.shape)
 
-
+#-----------<decoder>---------------
 
